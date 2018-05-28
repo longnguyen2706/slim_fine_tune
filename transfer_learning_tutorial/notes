@@ -1,0 +1,4 @@
+Debug:
+    Print out all variables saved in a checkpoint:
+        from tensorflow.python.tools import inspect_checkpoint as chkp
+        chkp.print_tensors_in_checkpoint_file('/home/duclong002/Desktop/fine_tune/slim_transfer_learning/transfer_learning_tutorial/log/Hela_hidden/model.ckpt-15300', tensor_name='', all_tensors=True)

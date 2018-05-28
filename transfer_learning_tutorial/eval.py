@@ -5,7 +5,7 @@ import inception_preprocessing
 from inception_resnet_v2 import inception_resnet_v2, inception_resnet_v2_arg_scope
 import time
 import os
-from train_flowers import get_split, load_batch
+from train import get_split, load_batch
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 slim = tf.contrib.slim
@@ -21,6 +21,7 @@ dataset_dir = '/home/duclong002/Dataset/JPEG_data/Hela/'
 # dataset_dir = '/home/duclong002/Dataset/Misc/flower_photos/'
 #State the batch_size to evaluate each time, which can be a lot more than the training batch
 batch_size = 36
+hidden1_size=64
 
 #State the number of epochs to evaluate
 num_epochs = 3
@@ -44,13 +45,28 @@ def run():
         num_batches_per_epoch = int(dataset.num_samples / batch_size)
         num_steps_per_epoch = num_batches_per_epoch
 
-        #Now create the inference model but set is_training=False
+        # Now create the inference model but set is_training=False
         with slim.arg_scope(inception_resnet_v2_arg_scope()):
             logits, end_points = inception_resnet_v2(images, num_classes = dataset.num_classes, is_training = False)
 
-        # #get all the variables to restore from the checkpoint file and create the saver function to restore
-        variables_to_restore = slim.get_variables_to_restore()
-        saver = tf.train.Saver(variables_to_restore)
+        # # #get all the variables to restore from the checkpoint file and create the saver function to restore
+        # variables_to_restore = slim.get_variables_to_restore()
+        # saver = tf.train.Saver(variables_to_restore)
+        pre_logits_flatten = end_points['PreLogitsFlatten']
+        hidden1 = slim.fully_connected(pre_logits_flatten, hidden1_size, activation_fn=None,
+                                       scope='Hidden1')
+        hidden1 = slim.dropout(hidden1, 1.0, is_training=True,
+                               scope='Dropout')
+
+        custom_logits = slim.fully_connected(hidden1, dataset.num_classes, activation_fn=None,
+                                             scope='Logits')
+        end_points['Logits'] = custom_logits
+
+        #  variables_to_restore.append(hidden1)
+        #  variables_to_restore.append(custom_logits)
+
+        end_points['Predictions'] = tf.nn.softmax(custom_logits, name='Predictions')
+        saver = tf.train.Saver()
         def restore_fn(sess):
             return saver.restore(sess, checkpoint_file)
 

@@ -12,8 +12,10 @@ slim = tf.contrib.slim
 
 
 #State where your log file is at. If it doesn't exist, create it.
-log_dir = './log/Hela_hidden'
-log_eval = './log_eval_test'
+# log_dir = './log/PAP_hidden'
+log_dir = './log/Hep'
+# log_dir = './log/Hela_hidden_finetune_last_layer'
+# log_eval = './log_eval_test/PAP'
 # log_dir = './log/flower'
 
 #State where your checkpoint file is
@@ -25,30 +27,36 @@ hidden1_size = 64
 
 #State dataset directory where the tfrecord files are located
 # dataset_dir = '/home/duclong002/Dataset/JPEG_data/PAP_smear/'
-dataset_dir = '/home/duclong002/Dataset/JPEG_data/Hela/'
+# dataset_dir = '/home/duclong002/Dataset/JPEG_data/Hela/'
+dataset_dir = '/home/duclong002/Dataset/JPEG_data/Hep/'
 # dataset_dir = '/home/duclong002/Dataset/Misc/flower_photos/'
 #State the number of classes to predict:
 # num_classes = 2
 # gray_scale = False
-num_classes = 10
-gray_scale = True
+# num_classes = 10
+# gray_scale = True
+num_classes = 6
+gray_scale = False
 # num_classes = 5
 # gray_scale = False
 
 #State the labels file and read it
 # labels_file = '/home/duclong002/Dataset/JPEG_data/PAP_smear/labels.txt'
-labels_file = '/home/duclong002/Dataset/JPEG_data/Hela/labels.txt'
+# labels_file = '/home/duclong002/Dataset/JPEG_data/Hela/labels.txt'
+labels_file = '/home/duclong002/Dataset/JPEG_data/Hep/labels.txt'
 # labels_file = '/home/duclong002/Dataset/Misc/flower_photos/labels.txt'
 labels = open(labels_file, 'r')
 
 #Create the file pattern of your TFRecord files so that it could be recognized later on
 # file_pattern = 'PAP_%s_*.tfrecord'
-file_pattern = 'Hela_%s_*.tfrecord'
+# file_pattern = 'Hela_%s_*.tfrecord'
+file_pattern = 'Hep_%s_*.tfrecord'
 # file_pattern = 'flower_%s_*.tfrecord'
 
 #File pattern
 # file_pattern_for_counting='PAP'
-file_pattern_for_counting='Hela'
+# file_pattern_for_counting='Hela'
+file_pattern_for_counting='Hep'
 # file_pattern_for_counting='flower'
 
 #Create a dictionary to refer each label to their string name
