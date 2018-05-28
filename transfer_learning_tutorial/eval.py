@@ -11,19 +11,19 @@ plt.style.use('ggplot')
 slim = tf.contrib.slim
 
 #State your log directory where you can retrieve your model
-log_dir = './log'
+log_dir = './log/Hela_hidden'
 
 #Create a new evaluation log directory to visualize the validation process
 log_eval = './log_eval_test'
 
 #State the dataset directory where the validation set is found
 dataset_dir = '/home/duclong002/Dataset/JPEG_data/Hela/'
-
+# dataset_dir = '/home/duclong002/Dataset/Misc/flower_photos/'
 #State the batch_size to evaluate each time, which can be a lot more than the training batch
 batch_size = 36
 
 #State the number of epochs to evaluate
-num_epochs = 1
+num_epochs = 3
 
 #Get the latest checkpoint file
 checkpoint_file = tf.train.latest_checkpoint(log_dir)

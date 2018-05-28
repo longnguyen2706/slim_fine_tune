@@ -5,29 +5,51 @@ import inception_preprocessing
 from inception_resnet_v2 import inception_resnet_v2, inception_resnet_v2_arg_scope
 import os
 import time
+from tensorflow.python import debug as tf_debug
 slim = tf.contrib.slim
 
 #================ DATASET INFORMATION ======================
-#State dataset directory where the tfrecord files are located
-dataset_dir = '/home/duclong002/Dataset/JPEG_data/PAP_smear/'
+
 
 #State where your log file is at. If it doesn't exist, create it.
-log_dir = './log'
+log_dir = './log/Hela_hidden'
+log_eval = './log_eval_test'
+# log_dir = './log/flower'
 
 #State where your checkpoint file is
 checkpoint_file = '/home/duclong002/pretrained_model/inception-resnet/inception_resnet_v2_2016_08_30.ckpt'
 
 #State the image size you're resizing your images to. We will use the default inception size of 299.
 image_size = 299
-
-#State the number of classes to predict:
-num_classes = 2
-
 hidden1_size = 64
 
+#State dataset directory where the tfrecord files are located
+# dataset_dir = '/home/duclong002/Dataset/JPEG_data/PAP_smear/'
+dataset_dir = '/home/duclong002/Dataset/JPEG_data/Hela/'
+# dataset_dir = '/home/duclong002/Dataset/Misc/flower_photos/'
+#State the number of classes to predict:
+# num_classes = 2
+# gray_scale = False
+num_classes = 10
+gray_scale = True
+# num_classes = 5
+# gray_scale = False
+
 #State the labels file and read it
-labels_file = '/home/duclong002/Dataset/JPEG_data/PAP_smear/labels.txt'
+# labels_file = '/home/duclong002/Dataset/JPEG_data/PAP_smear/labels.txt'
+labels_file = '/home/duclong002/Dataset/JPEG_data/Hela/labels.txt'
+# labels_file = '/home/duclong002/Dataset/Misc/flower_photos/labels.txt'
 labels = open(labels_file, 'r')
+
+#Create the file pattern of your TFRecord files so that it could be recognized later on
+# file_pattern = 'PAP_%s_*.tfrecord'
+file_pattern = 'Hela_%s_*.tfrecord'
+# file_pattern = 'flower_%s_*.tfrecord'
+
+#File pattern
+# file_pattern_for_counting='PAP'
+file_pattern_for_counting='Hela'
+# file_pattern_for_counting='flower'
 
 #Create a dictionary to refer each label to their string name
 labels_to_name = {}
@@ -36,8 +58,7 @@ for line in labels:
     string_name = string_name[:-1] #Remove newline
     labels_to_name[int(label)] = string_name
 
-#Create the file pattern of your TFRecord files so that it could be recognized later on
-file_pattern = 'PAP_%s_*.tfrecord'
+
 
 #Create a dictionary that will help people understand your dataset better. This is required by the Dataset class later.
 items_to_descriptions = {
@@ -48,19 +69,20 @@ items_to_descriptions = {
 
 #================= TRAINING INFORMATION ==================
 #State the number of epochs to train
-num_epochs = 70
+num_epochs = 200
 
 #State your batch size
 batch_size = 8
+validation_batch_size = 8
 
 #Learning rate information and configuration (Up to you to experiment)
-initial_learning_rate = 0.01 #0.0002
+initial_learning_rate = 0.0002 #0.001
 learning_rate_decay_factor = 0.7
 num_epochs_before_decay = 2
 
 #============== DATASET LOADING ======================
 #We now create a function that creates a Dataset class which will give us many TFRecord files to feed in the examples into a queue in parallel.
-def get_split(split_name, dataset_dir, file_pattern=file_pattern, file_pattern_for_counting='PAP'):
+def get_split(split_name, dataset_dir, file_pattern=file_pattern, file_pattern_for_counting=file_pattern_for_counting):
     '''
     Obtains the split - training or validation - to create a Dataset class for feeding the examples into a queue later on. This function will
     set up the decoder and dataset information all into one Dataset class so that you can avoid the brute work later on.
@@ -168,7 +190,7 @@ def load_batch(dataset, batch_size, height=image_size, width=image_size, is_trai
         num_threads = 4,
         capacity = 4 * batch_size,
         allow_smaller_final_batch = True)
-
+    print('images shape: ', images.shape)
     return images, raw_images, labels
 
 
@@ -187,7 +209,7 @@ def run():
         train_images, _, train_labels = load_batch(train_data, batch_size=batch_size)
 
         validation_data = get_split('validation', dataset_dir)
-        validation_images, _, validation_labels = load_batch(validation_data, batch_size=batch_size, is_training=False)
+        validation_images, _, validation_labels = load_batch(validation_data, batch_size=validation_batch_size, is_training=False)
 
         # Know the number steps to take before decaying the learning rate and batches per epoch
         num_batches_per_epoch = int(train_data.num_samples / batch_size)
@@ -198,11 +220,13 @@ def run():
 
         # Create the model inference
         with slim.arg_scope(inception_resnet_v2_arg_scope()):
-            _, end_points = inception_resnet_v2(train_images, num_classes=train_data.num_classes, is_training=True)
+            logits, end_points = inception_resnet_v2(train_images, num_classes=train_data.num_classes, is_training=True)
 
         # Define the scopes that you want to exclude for restoration
-        #exclude = ['InceptionResnetV2/Logits', 'InceptionResnetV2/AuxLogits', 'InceptionResnetV2/Conv2d_1a_3x3']
-        exclude = ['InceptionResnetV2/Logits', 'InceptionResnetV2/AuxLogits']
+        if gray_scale:
+            exclude = ['InceptionResnetV2/Logits', 'InceptionResnetV2/AuxLogits', 'InceptionResnetV2/Conv2d_1a_3x3']
+        else:
+            exclude = ['InceptionResnetV2/Logits', 'InceptionResnetV2/AuxLogits']
         variables_to_restore = slim.get_variables_to_restore(exclude=exclude)
 
         # Perform one-hot-encoding of the labels (Try one-hot-encoding within the load_batch function!)
@@ -218,10 +242,16 @@ def run():
         custom_logits = slim.fully_connected(hidden1, train_data.num_classes, activation_fn=None,
                                              scope='Logits')
         end_points['Logits'] = custom_logits
+
+      #  variables_to_restore.append(hidden1)
+      #  variables_to_restore.append(custom_logits)
+
+
         end_points['Predictions'] = tf.nn.softmax(custom_logits, name='Predictions')
 
         # Performs the equivalent to tf.nn.sparse_softmax_cross_entropy_with_logits but enhanced with checks
         train_loss = tf.losses.softmax_cross_entropy(onehot_labels=train_one_hot_labels, logits=custom_logits)
+        # train_loss = tf.losses.softmax_cross_entropy(onehot_labels=train_one_hot_labels, logits=logits)
         train_total_loss = tf.losses.get_total_loss()  # obtain the regularization losses as well
 
         # Create the global step for monitoring the learning_rate and training.
@@ -271,23 +301,37 @@ def run():
             time_elapsed = time.time() - start_time
 
             # Run the logging to print some results
-            logging.info('global Step %s: loss: %.4f (%.2f sec/step)', global_step_count, total_loss,
+            logging.info('Global Step %s/%s: loss: %.4f (%.2f sec/step)', global_step_count % num_steps_per_epoch + 1, num_steps_per_epoch, total_loss,
                          time_elapsed)
 
             return total_loss, global_step_count
-
-        def validation_step(sess, metrics_op, global_step):
-            start_time = time.time()
-            _, global_step_count, accuracy_value = sess.run([metrics_op, global_step_op, validation_accuracy])
-            time_elapsed = time.time() - start_time
-
-            # Log some information
-            logging.info('Global Step %s: Val streaming Accuracy: %.4f (%.2f sec/step)', global_step_count, accuracy_value,
-                         time_elapsed)
-
-            return accuracy_value
-
+        #
+        # def validation_step(sess, metrics_op, global_step):
+        #     # start_time = time.time()
+        #     # _, global_step_count, accuracy_value = sess.run([metrics_op, global_step_op, validation_accuracy])
+        #     # time_elapsed = time.time() - start_time
+        #     #
+        #     # # Log some information
+        #     # logging.info('Global Step %s: Val streaming Accuracy: %.4f (%.2f sec/step)', global_step_count, accuracy_value,
+        #     #              time_elapsed)
+        #     #
+        #     # return accuracy_value
+        #
+        #     config = tf.ConfigProto(device_count={'GPU': 0})  # mask GPUs visible to the session so it falls back on CPU
+        #     slim.evaluation.evaluation_loop(
+        #         master='local',
+        #         checkpoint_dir=log_dir,
+        #         logdir=log_eval,
+        #         num_evals=1,
+        #         eval_op= accuracy_value,
+        #         # variables_to_restore=variables_to_restore,
+        #         # summary_op=tf.summary.merge_all(),
+        #         eval_interval_secs=10,
+        #         session_config=config)  # <---- the actual fix
+        #
+        #     return accuracy_value
         # Now we create a saver function that actually restores the variables from a checkpoint file in a sess
+        print("variable to restore: ", variables_to_restore)
         saver = tf.train.Saver(variables_to_restore)
 
 
@@ -299,6 +343,7 @@ def run():
 
         # Run the managed session
         with sv.managed_session() as sess:
+            # sess=tf_debug.TensorBoardDebugWrapperSession(sess, 'localhost:6064')
             for step in range(num_steps_per_epoch * num_epochs):
                 # At the start of every epoch, show the vital information:
                 if step % num_batches_per_epoch == 0:
@@ -311,8 +356,10 @@ def run():
 
 
                     # optionally, print your logits and predictions for a sanity check that things are going fine.
+                    # logits_value, probabilities_value, predictions_value, labels_value = sess.run(
+                    #     [custom_logits, probabilities, predictions, train_labels])
                     logits_value, probabilities_value, predictions_value, labels_value = sess.run(
-                        [custom_logits, probabilities, predictions, train_labels])
+                        [logits, probabilities, predictions, train_labels])
                     print('logits: \n', logits_value)
                     print('Probabilities: \n', probabilities_value)
                     print('predictions: \n', predictions_value)
@@ -338,15 +385,20 @@ def run():
                     # )
 
                 # Log to summaries every 10 step.
-                if step % 10 == 0:
+                if step % 50 == 0:
                     train_loss, _ = train_step(sess, train_op, sv.global_step)
                     summaries = sess.run(my_summary_op)
                     sv.summary_computed(sess, summaries)
 
-                # If not, simply run the training step
+
                 if step % 100 == 0:
                     train_loss, _ = train_step(sess, train_op, sv.global_step)
-                    accuracy_value = validation_step(sess, validation_metrics_op, sv.global_step)
+                    logging.info('Current train Accuracy: %s', sess.run(train_accuracy))
+                    # accuracy_value = validation_step(sess, validation_metrics_op, sv.global_step)
+
+                 # If not, simply run the training step
+                else:
+                    loss, _ = train_step(sess, train_op, sv.global_step)
 
             # We log the final training loss and accuracy
             logging.info('Final Loss: %s', train_loss)
