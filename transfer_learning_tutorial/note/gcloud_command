@@ -1,0 +1,63 @@
+gcloud auth login
+gcloud compute scp --recurse /home/long/Desktop/transfer_learning_tutorial k80:~/
+
+
+PROJECT_ID=$(gcloud config list project --format "value(core.project)")
+BUCKET_NAME=${PROJECT_ID}-mlengine
+REGION=us-central1
+
+# make the bucket
+gsutil mb -l $REGION gs://$BUCKET_NAME
+
+# copy data
+gsutil cp -r /mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela gs://$BUCKET_NAME/JPEG_data/Hela_TFRecords
+
+# copy checkpoint
+gsutil cp -r /mnt/6B7855B538947C4E/pretrained_model/inception-resnet/inception_resnet_v2_2016_08_30.ckpt gs://$BUCKET_NAME/pretrained_model/inception_resnet_v2_2016_08_30.ckpt
+
+
+JOB_NAME=finetune_9_inception_resnet
+OUTPUT_PATH=gs://$BUCKET_NAME/$JOB_NAME
+DATASET_DIR=gs://$BUCKET_NAME/JPEG_data/Hela_TFRecords
+LOG_DIR=${OUTPUT_PATH}/log
+CHECKPOINT_FILE=gs://$BUCKET_NAME/pretrained_model/inception_resnet_v2_2016_08_30.ckpt
+LABELS_FILE=${DATASET_DIR}/labels.txt
+
+CODE=transfer_learning_tutorial
+
+gcloud ml-engine jobs submit training $JOB_NAME \
+    --job-dir $OUTPUT_PATH \
+    --runtime-version 1.4 \
+    --module-name $CODE.train_flowers \
+    --package-path $CODE \
+    --region $REGION \
+    --config $CODE/config.yaml \
+    -- \
+    --dataset_dir $DATASET_DIR \
+    --log_dir $LOG_DIR \
+    --checkpoint_file $CHECKPOINT_FILE \
+    --labels_file $LABELS_FILE
+
+python3 train_flowers.py --dataset_dir='/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela' \
+--log_dir='./log/Hela_train_logits_only' \
+--checkpoint_file='/mnt/6B7855B538947C4E/pretrained_model/inception-resnet/inception_resnet_v2_2016_08_30.ckpt' \
+--labels_file='/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela/labels.txt'
+
+CODE=transfer_learning_tutorial
+L_OUTPUT_PATH=$(pwd)/Desktop/temp
+L_DATASET_DIR=/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela
+L_LOG_DIR=${L_OUTPUT_PATH}/log
+L_CHECKPOINT_FILE=/mnt/6B7855B538947C4E/pretrained_model/inception_resnet_v2_2016_08_30.ckpt
+L_LABELS_FILE=${DATASET_DIR}/labels.txt
+
+gcloud ml-engine local train \
+    --module-name $CODE.train_flowers \
+    --package-path $CODE \
+    --job-dir $L_OUTPUT_PATH \
+     --configuration $CODE/config.yaml \
+    -- \
+    --dataset_dir $L_DATASET_DIR \
+    --log_dir $L_LOG_DIR \
+    --checkpoint_file $L_CHECKPOINT_FILE \
+    --labels_file $L_LABELS_FILE
+
