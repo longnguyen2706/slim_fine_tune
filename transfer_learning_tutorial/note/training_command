@@ -1,4 +1,12 @@
+gcsfuse --implicit-dirs gpu-machine-207012-mlengine /home/ndlong95/gcloud-storage
+
 python3 train.py --dataset_dir='/home/ndlong95/gcloud-storage/JPEG_data/Hela_TFRecords' \
 --log_dir='./log' \
 --checkpoint_file='/home/ndlong95/gcloud-storage/pretrained_model/inception_resnet_v2_2016_08_30.ckpt' \
 --labels_file='/home/ndlong95/gcloud-storage/JPEG_data/Hela_TFRecords/labels.txt'
+
+
+python3 train.py --dataset_dir='/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela' \
+--log_dir='./log' \
+--checkpoint_file='/mnt/6B7855B538947C4E/pretrained_model/inception-resnet/inception_resnet_v2_2016_08_30.ckpt' \
+--labels_file='/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela/labels.txt'

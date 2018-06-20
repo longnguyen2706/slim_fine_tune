@@ -174,7 +174,7 @@ def get_pretrained_net(train_data, train_images):
         exclude = ['InceptionResnetV2/Logits', 'InceptionResnetV2/AuxLogits']
 
     variables_to_restore = slim.get_variables_to_restore(exclude=exclude)
-    print('variables_to_restore: ', variables_to_restore)
+    # print('variables_to_restore: ', variables_to_restore)
     return exclude, end_points, variables_to_restore
 
 def add_custom_layers(end_points, train_data):
@@ -203,7 +203,7 @@ def get_unrestored_variables(exclude):
         # not_restored_vars.extend([var for var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)])
         unrestored_variables = tf.contrib.framework.get_variables(scope)
         unrestored_vars_init = tf.variables_initializer(unrestored_variables)
-    print("unrestored variables: ", unrestored_variables)
+    # print("unrestored variables: ", unrestored_variables)
     return unrestored_variables, unrestored_vars_init
 
 def get_trainable_variables(scope_name):
@@ -224,7 +224,9 @@ def main(_):
         tf.logging.set_verbosity(tf.logging.INFO) #Set the verbosity to INFO level
 
         #First create the dataset and load one batch
-        train_data, train_images, train_labels = get_batch_data('train', True, labels_to_name=labels_to_name)
+        train_data = get_split('train', FLAGS.dataset_dir, file_pattern=file_pattern, labels_to_name=labels_to_name)
+        train_images, _, train_labels = load_batch(train_data, batch_size=batch_size, is_training=True)
+        # train_data, train_images, train_labels = get_batch_data('train', True, labels_to_name=labels_to_name)
         val_data, val_images, val_labels = get_batch_data('validation', False, labels_to_name=labels_to_name)
 
         #Know the number steps to take before decaying the learning rate and batches per epoch
@@ -240,7 +242,7 @@ def main(_):
         unrestored_variables, unrestored_variables_init = get_unrestored_variables(exclude)
 
         trainable_variables.extend(unrestored_variables)
-        print("trainable variables: ", trainable_variables)
+        # print("trainable variables: ", trainable_variables)
 
         trainable_variables_init = tf.variables_initializer(trainable_variables)
 
@@ -279,9 +281,6 @@ def main(_):
 
         # validation_accuracy, validation_accuracy_update = tf.contrib.metrics.streaming_accuracy(predictions, validation_labels)
         # validation_metrics_op = tf.group(validation_accuracy_update)
-        global_step_op = tf.assign(global_step,
-                                   global_step + 1)  # no apply_gradient method so manually increasing the global_step
-
 
         #Now finally create all the summaries you need to monitor and group them into one summary op.
         tf.summary.scalar('losses/Total_Loss', train_total_loss)
@@ -295,9 +294,9 @@ def main(_):
             Simply runs a session for the three arguments provided and gives a logging on the time elapsed for each global step
             '''
             #Check the time for each sess run
-            print("train step")
+
             start_time = time.time()
-            total_loss, global_step_count, train_accuracy_val = sess.run([train_op, global_step_op, train_metrics_op])
+            total_loss, global_step_count, train_accuracy_val = sess.run([train_op, global_step, train_metrics_op])
             time_elapsed = time.time() - start_time
 
             #Run the logging to print some results
@@ -306,23 +305,27 @@ def main(_):
 
             return total_loss, global_step_count
 
+        saver = tf.train.Saver(variables_to_restore)
         def restore_fn():
             return tf.contrib.framework.assign_from_checkpoint_fn(FLAGS.checkpoint_file, variables_to_restore)
+        def init_fn(sess):
+            return saver.restore(sess, FLAGS.checkpoint_file)
         # Run the managed session
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         # sess = tf.Session(config=config, graph=graph)
+        sv = tf.train.Supervisor(logdir=FLAGS.log_dir, summary_op=None, init_fn=init_fn, graph=graph)
 
-    with tf.Session(config=config, graph=graph)as sess:
-
+    # with tf.Session(config=config, graph=graph)as sess:
+    with sv.managed_session() as sess:
         # with sv.managed_session() as sess:
-        init_global = tf.global_variables_initializer()
-        sess.run(init_global)
-        init_local = tf.local_variables_initializer()
-        sess.run(init_local)
+        # init_global = tf.global_variables_initializer()
+        # sess.run(init_global)
+        # init_local = tf.local_variables_initializer()
+        # sess.run(init_local)
+        # # restore_fn(sess)
+        # restore_fn = restore_fn()
         # restore_fn(sess)
-        restore_fn = restore_fn()
-        restore_fn(sess)
         # sess.run(global_step_init)
         sess.run(trainable_variables_init)
 
@@ -341,6 +344,9 @@ def main(_):
                 # optionally, print your logits and predictions for a sanity check that things are going fine.
                 # logits_value, probabilities_value, predictions_value, labels_value = sess.run(
                 #     [custom_logits, probabilities, predictions, train_labels])
+                # print (train_labels)
+                # labels_value = sess.run([train_labels])
+                # print ('labels: ', labels_value)
                 logits_value, probabilities_value, predictions_value, labels_value = sess.run(
                     [custom_logits, probabilities, predictions, train_labels])
                 print('logits: \n', logits_value)
@@ -350,19 +356,19 @@ def main(_):
 
             # Log to summaries every 50 step.
             if step % 50 == 0:
-                train_loss, _ = train_step(sess, train_op, global_step_op)
+                train_loss, _ = train_step(sess, train_op, sv.global_step)
                 summaries = sess.run(my_summary_op)
                 # sv.summary_computed(sess, summaries)
 
             if step % 100 == 0:
-                train_loss, _ = train_step(sess, train_op, global_step_op)
+                train_loss, _ = train_step(sess, train_op, sv.global_step)
                 logging.info('Current train Accuracy: %s', sess.run(train_accuracy))
                 # accuracy_value = validation_step(sess, validation_metrics_op, sv.global_step)
 
                 # If not, simply run the training step
             else:
                 # loss, _ = train_step(sess, train_op, sv.global_step)
-                loss, _ = train_step(sess, train_op, global_step_op)
+                loss, _ = train_step(sess, train_op, sv.global_step)
 
         # We log the final training loss and accuracy
         logging.info('Final Loss: %s', train_loss)
