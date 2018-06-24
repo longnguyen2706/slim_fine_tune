@@ -134,7 +134,7 @@ def main(_):
 
         # Update only the last layer for a few epochs.
         step = 0
-        for epoch in range(2):
+        for epoch in range(5):
 
             # Run an epoch over the training data.
             print('Starting epoch %d / %d' % (epoch + 1, 2))
@@ -177,7 +177,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--log_dir',
         type=str,
-        default='home/long/Desktop/processed_image/log'
+        default='/home/long/Desktop/processed_image/log'
 
     )
 
