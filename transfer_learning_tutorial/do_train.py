@@ -44,6 +44,20 @@ def check_accuracy(sess, correct_prediction, is_training, dataset_init_op):
     # Return the fraction of datapoints that were correctly classified
     acc = float(num_correct) / num_samples
     return acc
+
+def variable_summaries(var):
+  """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+  with tf.name_scope('summaries'):
+    mean = tf.reduce_mean(var)
+    tf.summary.scalar('mean', mean)
+    with tf.name_scope('stddev'):
+      stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+    tf.summary.scalar('stddev', stddev)
+    tf.summary.scalar('max', tf.reduce_max(var))
+    tf.summary.scalar('min', tf.reduce_min(var))
+    tf.summary.histogram('histogram', var)
+
+
 def main(_):
 
     graph = tf.Graph()
@@ -85,40 +99,56 @@ def main(_):
 
         tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=custom_logits)
         loss = tf.losses.get_total_loss()
+        mean_loss = tf.reduce_mean(loss)
+        tf.summary.scalar('mean_loss', mean_loss)
+        tf.summary.scalar('loss', loss)
 
 
         # optimizer
         finetune_optimizer = tf.train.GradientDescentOptimizer(FLAGS.finetune_learning_rate)
-        finetune_op = finetune_optimizer.minimize(loss, var_list= trainable_variables)
+        finetune_op = finetune_optimizer.minimize(mean_loss, var_list= trainable_variables)
 
         full_optimizer = tf.train.GradientDescentOptimizer(FLAGS.full_learning_rate)
-        full_op = full_optimizer.minimize(loss)
+        full_op = full_optimizer.minimize(mean_loss)
 
         # eval metric
         predictions = tf.to_int32(tf.argmax(end_points['Predictions'], 1))
         probabilities = end_points['Predictions']
         correct_prediction = tf.equal(predictions, labels)
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        tf.summary.scalar('accuracy', accuracy)
 
-        tf.get_default_graph().finalize()
+        merged = tf.summary.merge_all()
+        train_writer = tf.summary.FileWriter(FLAGS.log_dir + '/train',
+                                             graph)
+        test_writer = tf.summary.FileWriter(FLAGS.log_dir + '/test')
+
+
+
 
     with tf.Session(graph=graph) as sess:
+        tf.global_variables_initializer().run()
+        tf.get_default_graph().finalize()
         init_fn (sess)
         sess.run(trainable_variables_init)
 
         # Update only the last layer for a few epochs.
+        step = 0
         for epoch in range(2):
+
             # Run an epoch over the training data.
             print('Starting epoch %d / %d' % (epoch + 1, 2))
             # Here we initialize the iterator with the training set.
-            # This means that we can go through an entire epoch until the iterator becomes empty.
+                # This means that we can go through an entire epoch until the iterator becomes empty.
             sess.run(train_init_op)
             while True:
                 try:
                     sess.run([finetune_op], {is_training: True})
-                    current_loss = sess.run(loss, {is_training: False})
-                    print("loss: ", current_loss)
-                    print('accuracy: ', sess.run(accuracy, {is_training: False}))
+                    step+=1
+                    if (step % 10 == 0):
+                        summary, accuracy_value= sess.run([merged, accuracy], {is_training: False})
+                        train_writer.add_summary(summary, step)
+                        print('accuracy: ', accuracy_value)
                 except tf.errors.OutOfRangeError:
                     break
 
@@ -146,6 +176,8 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--log_dir',
+        type=str,
+        default='home/long/Desktop/processed_image/log'
 
     )
 
@@ -188,6 +220,7 @@ if __name__ == '__main__':
         # nargs='+',
         default=0.01
     )
+
     FLAGS, unparsed = parser.parse_known_args()
     print(FLAGS)
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
