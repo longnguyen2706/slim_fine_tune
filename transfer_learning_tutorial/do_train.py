@@ -218,7 +218,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--finetune_learning_rate',
         # nargs='+',
-        default=0.1,
+        default=0.2,
         type=float
     )
 

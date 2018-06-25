@@ -14,11 +14,11 @@ python3 train.py --dataset_dir='/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela' \
 
 python3 do_train.py --train_dir='/home/duclong002/Desktop/Hela/train/' \
 --eval_dir='/home/duclong002/Desktop/Hela/val/' \
---log_dir='/home/duclong002/Desktop/slim_fine_tune/log/' \
+--log_dir='/home/duclong002/Desktop/slim_fine_tune/log2/' \
 --checkpoint_file='/home/duclong002/pretrained_model/inception-resnet/inception_resnet_v2_2016_08_30.ckpt' \
 --train_batch=8 \
 --eval_batch=32 \
 --gray_scale=True \
 --hidden1_size=50 \
---finetune_learning_rate=0.1 \
+--finetune_learning_rate=0.2 \
 --full_learning_rate=0.01
