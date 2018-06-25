@@ -91,7 +91,7 @@ def main(_):
         end_points, custom_logits = net.add_custom_layers(end_points, num_classes, FLAGS.hidden1_size)
         trainable_variables = net.get_trainable_variables("AddedClassifier")
         unrestored_variables, unrestored_variables_init = net.get_unrestored_variables(exclude)
-        trainable_variables.extend(unrestored_variables)
+        # trainable_variables.extend(unrestored_variables)
         # print("trainable variables: ", trainable_variables)
         trainable_variables_init = tf.variables_initializer(trainable_variables)
 
@@ -130,6 +130,7 @@ def main(_):
         tf.global_variables_initializer().run()
         tf.get_default_graph().finalize()
         init_fn (sess)
+        sess.run(unrestored_variables_init)
         sess.run(trainable_variables_init)
 
         # Update only the last layer for a few epochs.
