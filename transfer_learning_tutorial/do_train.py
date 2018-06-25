@@ -134,10 +134,10 @@ def main(_):
 
         # Update only the last layer for a few epochs.
         step = 0
-        for epoch in range(5):
+        for epoch in range(50):
 
             # Run an epoch over the training data.
-            print('Starting epoch %d / %d' % (epoch + 1, 2))
+            print('Starting epoch %d / %d' % (epoch + 1, 50))
             # Here we initialize the iterator with the training set.
                 # This means that we can go through an entire epoch until the iterator becomes empty.
             sess.run(train_init_op)
@@ -145,7 +145,7 @@ def main(_):
                 try:
                     sess.run([finetune_op], {is_training: True})
                     step+=1
-                    if (step % 10 == 0):
+                    if (step % 25 == 0):
                         summary, accuracy_value= sess.run([merged, accuracy], {is_training: False})
                         train_writer.add_summary(summary, step)
                         print('accuracy: ', accuracy_value)
@@ -164,12 +164,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--train_dir',
+        type=str,
         # nargs='+',
         default='/home/long/Desktop/processed_image/train'
     )
 
     parser.add_argument(
         '--eval_dir',
+        type=str,
         # nargs="+",
         default='/home/long/Desktop/processed_image/eval'
     )
@@ -183,18 +185,21 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--checkpoint_file',
-        default='/mnt/6B7855B538947C4E/pretrained_model/inception-resnet/inception_resnet_v2_2016_08_30.ckpt'
+        default='/mnt/6B7855B538947C4E/pretrained_model/inception-resnet/inception_resnet_v2_2016_08_30.ckpt',
+        type=str
     )
 
     parser.add_argument(
         '--train_batch',
         # nargs='+',
-        default=8
+        default=8,
+        type=int
     )
     parser.add_argument(
         '--eval_batch',
         # nargs='+',
-        default=16
+        default=16,
+        type=int
     )
     parser.add_argument(
         '--gray_scale',
@@ -205,20 +210,23 @@ if __name__ == '__main__':
     parser.add_argument(
         '--hidden1_size',
         # nargs='+',
-        default=50
+        default=50,
+        type=int
     )
 
 
     parser.add_argument(
         '--finetune_learning_rate',
         # nargs='+',
-        default=0.1
+        default=0.1,
+        type=float
     )
 
     parser.add_argument(
         '--full_learning_rate',
         # nargs='+',
-        default=0.01
+        default=0.01,
+        type=float
     )
 
     FLAGS, unparsed = parser.parse_known_args()

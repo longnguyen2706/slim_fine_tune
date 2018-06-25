@@ -1,7 +1,7 @@
 import tensorflow as tf
 import os
 slim = tf.contrib.slim
-from transfer_learning_tutorial import inception_preprocessing
+import inception_preprocessing
 
 num_classes = 10
 gray_scale = True
