@@ -239,7 +239,7 @@ def main(_):
         unrestored_variables, unrestored_variables_init = get_unrestored_variables(exclude)
 
         # trainable_variables.extend(unrestored_variables)
-        # print("trainable variables: ", trainable_variables)
+        print("trainable variables: ", trainable_variables)
 
         # trainable_variables_init = tf.variables_initializer(trainable_variables)
         # Perform one-hot-encoding of the labels (Try one-hot-encoding within the load_batch function!)
