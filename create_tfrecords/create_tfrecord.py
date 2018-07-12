@@ -51,7 +51,7 @@ def main():
     # Divide the training datasets into train and test:
     random.seed(FLAGS.random_seed)
     random.shuffle(photo_filenames)
-    training_filenames = photo_filenames[num_validation:]
+    training_filenames = photo_filenames[num_validation:] #TODO: pass the list of train/val/test image here
     validation_filenames = photo_filenames[:num_validation]
 
     # First, convert the training and validation sets.

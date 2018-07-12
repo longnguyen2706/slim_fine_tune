@@ -57,5 +57,7 @@ fabric.properties
 # Editor-based Rest Client
 .idea/httpRequests
 
-*.pyc
-
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
