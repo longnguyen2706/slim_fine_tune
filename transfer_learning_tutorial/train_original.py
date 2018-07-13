@@ -205,8 +205,11 @@ def get_unrestored_variables(exclude):
     # print("unrestored variables: ", unrestored_variables)
     return unrestored_variables, unrestored_vars_init
 
-def get_trainable_variables(scope_name):
-    return [var for var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope_name)]
+def get_trainable_variables(scope_names):
+    vars = []
+    for scope_name in scope_names:
+        vars.extend([var for var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope_name)]
+    return vars
 
 
 def main(_):
@@ -235,7 +238,7 @@ def main(_):
         exclude, end_points, variables_to_restore = get_pretrained_net(train_data, train_images)
         end_points, custom_logits = add_custom_layers(end_points, train_data)
 
-        trainable_variables = get_trainable_variables("AddedClassifier")
+        trainable_variables = get_trainable_variables(["AddedClassifier", "AvgPool_1a_8x8"])
         unrestored_variables, unrestored_variables_init = get_unrestored_variables(exclude)
 
         # trainable_variables.extend(unrestored_variables)
