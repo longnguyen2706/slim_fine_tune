@@ -22,3 +22,14 @@ python3 do_train.py --train_dir='/home/duclong002/Desktop/Hela/train/' \
 --hidden1_size=50 \
 --finetune_learning_rate=0.2 \
 --full_learning_rate=0.01
+
+
+python3 train_original.py --dataset_dir='/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela' \
+--log_dir='/home/long/Desktop/slim_fine_tune_log' \
+--checkpoint_file='/mnt/6B7855B538947C4E/pretrained_model/inception-resnet/inception_resnet_v2_2016_08_30.ckpt' \
+--labels_file='/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela/labels.txt'
+
+python3 train_no_hidden.py --dataset_dir='/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela' \
+--log_dir='/home/long/Desktop/slim_fine_tune_log2' \
+--checkpoint_file='/mnt/6B7855B538947C4E/pretrained_model/inception-resnet/inception_resnet_v2_2016_08_30.ckpt' \
+--labels_file='/mnt/6B7855B538947C4E/Dataset/JPEG_data/Hela/labels.txt'

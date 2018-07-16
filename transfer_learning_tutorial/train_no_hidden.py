@@ -1,5 +1,5 @@
-import sys
 import argparse
+import sys
 import tensorflow as tf
 from tensorflow.contrib.framework.python.ops.variables import get_or_create_global_step
 from tensorflow.python.platform import tf_logging as logging
@@ -29,13 +29,13 @@ items_to_descriptions = {
 
 #================= TRAINING INFORMATION ==================
 #State the number of epochs to train
-num_epochs = 5
+num_epochs = 50
 
 #State your batch size
 batch_size = 8
 
 #Learning rate information and configuration (Up to you to experiment)
-initial_learning_rate = 0.0002
+initial_learning_rate = 0.1
 learning_rate_decay_factor = 0.7
 num_epochs_before_decay = 2
 
@@ -50,7 +50,10 @@ def label_to_name(labels_file):
         labels_to_name[int(label)] = string_name
     return labels_to_name
 
-#We now create a function that creates a Dataset class which will give us many TFRecord files to feed in the examples into a queue in parallel.
+
+
+# ============== DATASET LOADING ======================
+# We now create a function that creates a Dataset class which will give us many TFRecord files to feed in the examples into a queue in parallel.
 def get_split(split_name, dataset_dir, labels_to_name, file_pattern=file_pattern, file_pattern_for_counting=file_pattern_for_counting):
     '''
     Obtains the split - training or validation - to create a Dataset class for feeding the examples into a queue later on. This function will
@@ -67,54 +70,57 @@ def get_split(split_name, dataset_dir, labels_to_name, file_pattern=file_pattern
     - dataset (Dataset): A Dataset class object where we can read its various components for easier batch creation later.
     '''
 
-    #First check whether the split_name is train or validation
+    # First check whether the split_name is train or validation
     if split_name not in ['train', 'validation']:
-        raise ValueError('The split_name %s is not recognized. Please input either train or validation as the split_name' % (split_name))
+        raise ValueError(
+            'The split_name %s is not recognized. Please input either train or validation as the split_name' % (
+            split_name))
 
-    #Create the full path for a general file_pattern to locate the tfrecord_files
+    # Create the full path for a general file_pattern to locate the tfrecord_files
     file_pattern_path = os.path.join(dataset_dir, file_pattern % (split_name))
 
-    #Count the total number of examples in all of these shard
+    # Count the total number of examples in all of these shard
     num_samples = 0
     file_pattern_for_counting = file_pattern_for_counting + '_' + split_name
-    tfrecords_to_count = [os.path.join(dataset_dir, file) for file in os.listdir(dataset_dir) if file.startswith(file_pattern_for_counting)]
+    tfrecords_to_count = [os.path.join(dataset_dir, file) for file in os.listdir(dataset_dir) if
+                          file.startswith(file_pattern_for_counting)]
     for tfrecord_file in tfrecords_to_count:
         for record in tf.python_io.tf_record_iterator(tfrecord_file):
             num_samples += 1
 
-    #Create a reader, which must be a TFRecord reader in this case
+    # Create a reader, which must be a TFRecord reader in this case
     reader = tf.TFRecordReader
 
-    #Create the keys_to_features dictionary for the decoder
+    # Create the keys_to_features dictionary for the decoder
     keys_to_features = {
-      'image/encoded': tf.FixedLenFeature((), tf.string, default_value=''),
-      'image/format': tf.FixedLenFeature((), tf.string, default_value='jpg'),
-      'image/class/label': tf.FixedLenFeature(
-          [], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
+        'image/encoded': tf.FixedLenFeature((), tf.string, default_value=''),
+        'image/format': tf.FixedLenFeature((), tf.string, default_value='jpg'),
+        'image/class/label': tf.FixedLenFeature(
+            [], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
     }
 
-    #Create the items_to_handlers dictionary for the decoder.
+    # Create the items_to_handlers dictionary for the decoder.
     items_to_handlers = {
-    'image': slim.tfexample_decoder.Image(),
-    'label': slim.tfexample_decoder.Tensor('image/class/label'),
+        'image': slim.tfexample_decoder.Image(),
+        'label': slim.tfexample_decoder.Tensor('image/class/label'),
     }
 
-    #Start to create the decoder
+    # Start to create the decoder
     decoder = slim.tfexample_decoder.TFExampleDecoder(keys_to_features, items_to_handlers)
 
-    #Create the labels_to_name file
+    # Create the labels_to_name file
     labels_to_name_dict = labels_to_name
 
-    #Actually create the dataset
+    # Actually create the dataset
     dataset = slim.dataset.Dataset(
-        data_sources = file_pattern_path,
-        decoder = decoder,
-        reader = reader,
-        num_readers = 4,
-        num_samples = num_samples,
-        num_classes = num_classes,
-        labels_to_name = labels_to_name_dict,
-        items_to_descriptions = items_to_descriptions)
+        data_sources=file_pattern_path,
+        decoder=decoder,
+        reader=reader,
+        num_readers=4,
+        num_samples=num_samples,
+        num_classes=num_classes,
+        labels_to_name=labels_to_name_dict,
+        items_to_descriptions=items_to_descriptions)
 
     return dataset
 
@@ -174,86 +180,28 @@ def main(_):
     with tf.Graph().as_default() as graph:
         tf.logging.set_verbosity(tf.logging.INFO)  # Set the verbosity to INFO level
 
-        def get_pretrained_net(train_data, train_images):
-            # Create the model inference
-            with slim.arg_scope(inception_resnet_v2_arg_scope()):
-                _, end_points = inception_resnet_v2(train_images, num_classes=train_data.num_classes, is_training=True)
-
-            # Define the scopes that you want to exclude for restoration
-            if gray_scale:
-                exclude = ['InceptionResnetV2/Logits', 'InceptionResnetV2/AuxLogits', 'InceptionResnetV2/Conv2d_1a_3x3']
-            else:
-                exclude = ['InceptionResnetV2/Logits', 'InceptionResnetV2/AuxLogits']
-
-            variables_to_restore = slim.get_variables_to_restore(exclude=exclude)
-            # print('variables_to_restore: ', variables_to_restore)
-            return exclude, end_points, variables_to_restore
-
-
-        def add_custom_layers(end_points, train_data):
-            # Define new layers (see InceptionResnet implementation to know why)
-            pre_logits_flatten = end_points['PreLogitsFlatten']
-            hidden1 = slim.fully_connected(pre_logits_flatten, hidden1_size, activation_fn=None,
-                                           scope='AddedClassifier/Hidden1')
-            hidden1 = slim.dropout(hidden1, 1.0, is_training=True,
-                                   scope='AddedClassifier/Hidden1/Dropout')
-
-            custom_logits = slim.fully_connected(hidden1, train_data.num_classes, activation_fn=None,
-                                                 scope='AddedClassifier/Logits')
-            end_points['Logits'] = custom_logits
-            end_points['Predictions'] = tf.nn.softmax(custom_logits, name='Predictions')
-
-            return end_points, custom_logits
-
-        def get_batch_data(data_name, is_training, labels_to_name):
-            data = get_split(data_name, FLAGS.dataset_dir, file_pattern=file_pattern, labels_to_name=labels_to_name)
-            images, _, labels = load_batch(data, batch_size=batch_size, is_training=is_training)
-            return data, images, labels
-
-        def get_unrestored_variables(exclude):
-            unrestored_variables = []
-            for scope_name in exclude:
-                # not_restored_vars.extend([var for var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)])
-                # unrestored_variables = tf.contrib.framework.get_variables(scope_name)
-                unrestored_variables.extend([unrestored_variable for unrestored_variable in
-                                             tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope_name)])
-                unrestored_vars_init = tf.variables_initializer(unrestored_variables)
-            # print("unrestored variables: ", unrestored_variables)
-            return unrestored_variables, unrestored_vars_init
-
-        def get_trainable_variables(scope_names):
-            vars = []
-            for scope_name in scope_names:
-                vars.extend([var for var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope_name)])
-            return vars
-
         # First create the dataset and load one batch
-        train_data = get_split('train', FLAGS.dataset_dir, file_pattern=file_pattern, labels_to_name=labels_to_name)
-        train_images, _, train_labels = load_batch(train_data, batch_size=batch_size, is_training=True)
-        # train_data, train_images, train_labels = get_batch_data('train', True, labels_to_name=labels_to_name)
-        val_data, val_images, val_labels = get_batch_data('validation', False, labels_to_name=labels_to_name)
+        dataset = get_split('train', FLAGS.dataset_dir, file_pattern=file_pattern, labels_to_name=labels_to_name)
+        images, _, labels = load_batch(dataset, batch_size=batch_size)
 
         # Know the number steps to take before decaying the learning rate and batches per epoch
-        num_batches_per_epoch = int(train_data.num_samples / batch_size)
+        num_batches_per_epoch = int(dataset.num_samples / batch_size)
         num_steps_per_epoch = num_batches_per_epoch  # Because one step is one batch processed
         decay_steps = int(num_epochs_before_decay * num_steps_per_epoch)
 
         # Create the model inference
-        exclude, end_points, variables_to_restore = get_pretrained_net(train_data, train_images)
-        end_points, custom_logits = add_custom_layers(end_points, train_data)
+        with slim.arg_scope(inception_resnet_v2_arg_scope()):
+            logits, end_points = inception_resnet_v2(images, num_classes=dataset.num_classes, is_training=True)
 
-        trainable_variables = get_trainable_variables(["AddedClassifier", "MaxPool_3a_3x3"])
-        unrestored_variables, unrestored_variables_init = get_unrestored_variables(exclude)
+        # Define the scopes that you want to exclude for restoration
+        exclude = ['InceptionResnetV2/Logits', 'InceptionResnetV2/AuxLogits', 'InceptionResnetV2/Conv2d_1a_3x3']
+        variables_to_restore = slim.get_variables_to_restore(exclude=exclude)
 
-        # trainable_variables.extend(unrestored_variables)
-        print("trainable variables: ", trainable_variables)
-
-        # trainable_variables_init = tf.variables_initializer(trainable_variables)
         # Perform one-hot-encoding of the labels (Try one-hot-encoding within the load_batch function!)
-        one_hot_labels = slim.one_hot_encoding(train_labels, train_data.num_classes)
+        one_hot_labels = slim.one_hot_encoding(labels, dataset.num_classes)
 
         # Performs the equivalent to tf.nn.sparse_softmax_cross_entropy_with_logits but enhanced with checks
-        loss = tf.losses.softmax_cross_entropy(onehot_labels=one_hot_labels, logits=custom_logits)
+        loss = tf.losses.softmax_cross_entropy(onehot_labels=one_hot_labels, logits=logits)
         total_loss = tf.losses.get_total_loss()  # obtain the regularization losses as well
 
         # Create the global step for monitoring the learning_rate and training.
@@ -271,12 +219,12 @@ def main(_):
         optimizer = tf.train.AdamOptimizer(learning_rate=lr)
 
         # Create the train_op.
-        train_op = slim.learning.create_train_op(total_loss, optimizer, variables_to_train=trainable_variables)
+        train_op = slim.learning.create_train_op(total_loss, optimizer)
 
         # State the metrics that you want to predict. We get a predictions that is not one_hot_encoded.
         predictions = tf.argmax(end_points['Predictions'], 1)
         probabilities = end_points['Predictions']
-        accuracy, accuracy_update = tf.contrib.metrics.streaming_accuracy(predictions, train_labels)
+        accuracy, accuracy_update = tf.contrib.metrics.streaming_accuracy(predictions, labels)
         metrics_op = tf.group(accuracy_update, probabilities)
 
         # Now finally create all the summaries you need to monitor and group them into one summary op.
@@ -311,12 +259,6 @@ def main(_):
 
         # Run the managed session
         with sv.managed_session() as sess:
-            variables_names = [v.name for v in tf.trainable_variables()]
-            values = sess.run(variables_names)
-            for k, v in zip(variables_names, values):
-                print("Variable: ", k)
-                print("Shape: ", v.shape)
-                print(v)
             for step in range(num_steps_per_epoch * num_epochs):
                 # At the start of every epoch, show the vital information:
                 if step % num_batches_per_epoch == 0:
@@ -327,8 +269,8 @@ def main(_):
 
                     # optionally, print your logits and predictions for a sanity check that things are going fine.
                     logits_value, probabilities_value, predictions_value, labels_value = sess.run(
-                        [custom_logits, probabilities, predictions, train_labels])
-                    print ('logits: \n', logits_value)
+                        [logits, probabilities, predictions, labels])
+                    print('logits: \n', logits_value)
                     print('Probabilities: \n', probabilities_value)
                     print( 'predictions: \n', predictions_value)
                     print('Labels:\n:', labels_value)
